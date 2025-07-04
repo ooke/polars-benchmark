@@ -140,8 +140,18 @@ def run_query(query_number: int, query: str) -> None:
         def execute() -> _pd.DataFrame:
             cursor = conn.execute(query)
             rows = cursor.fetchall()
-            cols = [col[0] for col in cursor.description]
-            return _pd.DataFrame(rows, columns=cols)
+            cols = cursor.column_names()
+            df = _pd.DataFrame(rows, columns=cols)
+            # Convert DECIMAL columns to float and round to their scale for consistent comparison
+            for name, dtype in cursor.columns().items():
+                scale = None
+                if isinstance(dtype, dict):
+                    if dtype.get("type", "").upper() == "DECIMAL":
+                        scale = dtype.get("scale")
+                if scale is not None:
+                    vals = df[name].astype(float)
+                    df[name] = vals.round(scale)
+            return df
 
     run_query_generic(
         execute,
